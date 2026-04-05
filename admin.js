@@ -249,7 +249,7 @@ const Admin = {
                 attendance: item['出席番'],
                 password: 'GE12345',
                 pw_changed: false
-            });
+            }, { merge: true });
         });
         
         try {
@@ -270,10 +270,14 @@ const Admin = {
                 if (doc.data().email !== 'admin') users.push(doc.data());
             });
 
+            // Sort by name ascending
+            users.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'));
+
             const container = document.getElementById('student-table-container');
             
             if (users.length === 0) {
                 container.innerHTML = '<p class="subtitle">生徒情報が未登録です</p>';
+                document.getElementById('student-batch-actions').style.display = 'none';
                 return;
             }
 
@@ -281,8 +285,9 @@ const Admin = {
                 <table class="glass">
                     <thead>
                         <tr>
-                            <th>メールアドレス</th>
+                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all-students" onchange="Admin.toggleAllStudents(this.checked)"></th>
                             <th>名前</th>
+                            <th>メールアドレス</th>
                             <th>クラス</th>
                             <th>出席番</th>
                             <th>PW変更済</th>
@@ -294,8 +299,9 @@ const Admin = {
             users.forEach(user => {
                 html += `
                     <tr>
-                        <td>${user.email}</td>
+                        <td style="text-align: center;"><input type="checkbox" class="student-cb" data-email="${user.email}" onchange="Admin.updateStudentBatchUI()"></td>
                         <td>${user.name}</td>
+                        <td>${user.email}</td>
                         <td>${user.class || 'ー'}</td>
                         <td>${user.attendance || 'ー'}</td>
                         <td>${user.pw_changed ? '✅' : '❌'}</td>
@@ -305,10 +311,70 @@ const Admin = {
 
             html += '</tbody></table>';
             container.innerHTML = html;
+            Admin.updateStudentBatchUI();
         } catch (e) {
             console.error('Error fetching students:', e);
             document.getElementById('student-table-container').innerHTML = '<p class="error">生徒情報の読み込みに失敗しました。</p>';
         }
+    },
+
+    toggleAllStudents: (checked) => {
+        const checkboxes = document.querySelectorAll('.student-cb');
+        checkboxes.forEach(cb => cb.checked = checked);
+        Admin.updateStudentBatchUI();
+    },
+
+    updateStudentBatchUI: () => {
+        const checkboxes = document.querySelectorAll('.student-cb:checked');
+        const container = document.getElementById('student-batch-actions');
+        const countText = document.getElementById('selected-student-count');
+        const masterCb = document.getElementById('select-all-students');
+        const allCheckboxes = document.querySelectorAll('.student-cb');
+        
+        if (container) {
+            container.style.display = checkboxes.length > 0 ? 'flex' : 'none';
+            countText.innerText = `${checkboxes.length}名選択中`;
+        }
+        if (masterCb && allCheckboxes.length > 0) {
+            masterCb.checked = checkboxes.length === allCheckboxes.length;
+        }
+    },
+
+    deleteSelectedStudents: async () => {
+        const checkboxes = document.querySelectorAll('.student-cb:checked');
+        if (checkboxes.length === 0) return;
+        
+        if (!confirm(`選択した ${checkboxes.length} 名の生徒を削除してもよろしいですか？`)) return;
+        
+        const batch = db.batch();
+        checkboxes.forEach(cb => {
+            const email = cb.getAttribute('data-email');
+            batch.delete(db.collection('users').doc(email));
+        });
+        
+        await batch.commit();
+        alert('削除しました');
+        Admin.renderStudentList();
+    },
+
+    resetSelectedPasswords: async () => {
+        const checkboxes = document.querySelectorAll('.student-cb:checked');
+        if (checkboxes.length === 0) return;
+        
+        if (!confirm(`選択した ${checkboxes.length} 名のパスワードを「GE12345」にリセットします。よろしいですか？`)) return;
+        
+        const batch = db.batch();
+        checkboxes.forEach(cb => {
+            const email = cb.getAttribute('data-email');
+            batch.update(db.collection('users').doc(email), {
+                password: 'GE12345',
+                pw_changed: false
+            });
+        });
+        
+        await batch.commit();
+        alert('パスワードをリセットしました');
+        Admin.renderStudentList();
     },
 
     handleEventCSV: async (e) => {
@@ -436,7 +502,12 @@ const Admin = {
                     <td>${item.月}/${item.日}</td>
                     <td>${item.曜日}</td>
                     <td>${item.行事名}</td>
-                    <td><span class="status-badge status-${item.実施有無}">${item.実施有無 == 1 ? '実施' : 'なし'}</span></td>
+                    <td>
+                        <select onchange="Admin.updateImplementationStatus('${dateStr}', this.value)" style="width: auto; padding: 0.2rem; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: var(--text-main);">
+                            <option value="1" ${item.実施有無 == 1 ? 'selected' : ''}>実施</option>
+                            <option value="0" ${item.実施有無 == 0 ? 'selected' : ''}>なし</option>
+                        </select>
+                    </td>
                     <td>${qFile ? '✅' : 'ー'}</td>
                     <td>${aFile ? '✅' : 'ー'}</td>
                     <td>
@@ -448,6 +519,19 @@ const Admin = {
 
         html += '</tbody></table>';
         container.innerHTML = html;
+    },
+
+    updateImplementationStatus: async (dateId, status) => {
+        try {
+            await db.collection('schedule').doc(dateId).update({
+                実施有無: parseInt(status)
+            });
+            // Optional: refresh student view if needed, but here simple confirm is enough
+            console.log(`Updated status for ${dateId} to ${status}`);
+        } catch (e) {
+            console.error('Error updating status:', e);
+            alert('状態の更新に失敗しました。');
+        }
     },
 
     checkFileExists: async (id) => {
