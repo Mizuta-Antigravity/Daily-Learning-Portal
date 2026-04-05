@@ -397,16 +397,27 @@ const Admin = {
         const aFiles = document.getElementById('bulk-answers').files;
         const monthInput = document.getElementById('upload-month').value;
 
-        if (!monthInput) return alert('対象月を選択してください');
+        if (!monthInput || monthInput === "") return alert('対象月を選択してください');
         const [year, month] = monthInput.split('-').map(Number);
         
         const schedule = await Utils.getAllSchedule();
-        // Filter schedule for this month where implementation = 1
-        const targetDates = schedule.filter(item => 
-            item.月 == month && item.実施有無 == 1
-        ).sort((a,b) => a.日 - b.日);
+        
+        // Helper: same logic as academicSort but encapsulated
+        const getRank = (m, d) => {
+            const mm = parseInt(m);
+            const dd = parseInt(d);
+            return (mm >= 4 ? mm - 4 : mm + 8) * 100 + dd;
+        };
+        const selectedMonthRank = getRank(month, 0);
 
-        if (targetDates.length === 0) return alert('この月に実施日は設定されていません');
+        // Filter schedule for this month and onwards in the academic year where implementation = 1
+        const targetDates = schedule.filter(item => {
+            if (item.実施有無 != 1) return false;
+            const itemRank = getRank(item.月, item.日);
+            return itemRank >= selectedMonthRank;
+        }).sort((a, b) => getRank(a.月, a.日) - getRank(b.月, b.日));
+
+        if (targetDates.length === 0) return alert('指定された月以降に実施日は設定されていません');
 
         // Sort files by numerical name
         const sortFiles = (fileList) => {
@@ -419,24 +430,54 @@ const Admin = {
 
         const sortedQ = sortFiles(qFiles);
         const sortedA = sortFiles(aFiles);
+        const maxFiles = Math.max(sortedQ.length, sortedA.length);
 
-        let countQ = 0;
-        let countA = 0;
+        if (maxFiles === 0) return alert('アップロードするファイルを選択してください');
 
-        for (let i = 0; i < targetDates.length; i++) {
-            const dateStr = targetDates[i].id;
-            
-            if (sortedQ[i]) {
-                await Utils.saveFile(`${dateStr}-Q`, sortedQ[i], 'question', dateStr);
-                countQ++;
+        Admin.showLoading('一括アップロード中...', `準備しています... (0/${maxFiles}件)`);
+
+        let completed = 0;
+        const CONCURRENCY = 3; // Process 3 dates at a time
+        const totalToProcess = Math.min(maxFiles, targetDates.length);
+        
+        for (let i = 0; i < maxFiles; i += CONCURRENCY) {
+            const batch = [];
+            for (let j = 0; j < CONCURRENCY && (i + j) < maxFiles; j++) {
+                const index = i + j;
+                if (index >= targetDates.length) break; // Out of implementation days
+
+                const dateStr = targetDates[index].id;
+                
+                const uploadDatePromises = [];
+                if (sortedQ[index]) {
+                    uploadDatePromises.push(Utils.saveFile(`${dateStr}-Q`, sortedQ[index], 'question', dateStr));
+                }
+                if (sortedA[index]) {
+                    uploadDatePromises.push(Utils.saveFile(`${dateStr}-A`, sortedA[index], 'answer', dateStr));
+                }
+                
+                batch.push(Promise.all(uploadDatePromises).then(() => {
+                    completed++;
+                    const percent = Math.round((completed / totalToProcess) * 100);
+                    Admin.updateLoading(`アップロード中... (${completed}/${totalToProcess}件)`, percent);
+                }));
             }
-            if (sortedA[i]) {
-                await Utils.saveFile(`${dateStr}-A`, sortedA[i], 'answer', dateStr);
-                countA++;
+            
+            if (batch.length > 0) {
+                await Promise.all(batch);
+            } else {
+                break; // No more target dates but still have files
             }
         }
 
-        alert(`処理完了:\n問題: ${countQ}件\n解答: ${countA}件をアップロードしました`);
+        Admin.hideLoading();
+        
+        if (maxFiles > targetDates.length) {
+            alert(`一部のファイルがアップロードされませんでした。\n実施日が足りません (実施日: ${targetDates.length}件、ファイル: ${maxFiles}件)`);
+        } else {
+            alert(`処理完了:\n合計 ${totalToProcess}件の実施日にファイルを割り当てました。`);
+        }
+        
         Admin.renderSchedulePreview();
         Admin.renderStorageMeter();
     },
@@ -586,6 +627,10 @@ const Admin = {
             return;
         }
 
+        const total = checkboxes.length;
+        Admin.showLoading('ファイルを削除中...', `準備しています... (0/${total}件)`);
+        
+        let completed = 0;
         // Processing deletion
         for (const cb of checkboxes) {
             const dateStr = cb.getAttribute('data-date');
@@ -602,13 +647,45 @@ const Admin = {
             } catch (e) {
                 console.error('Failed to parse downloaded_days from localStorage:', e);
             }
+            
+            completed++;
+            const percent = Math.round((completed / total) * 100);
+            Admin.updateLoading(`削除中... (${completed}/${total}件)`, percent);
         }
 
+        Admin.hideLoading();
         alert('ファイルの削除が完了しました');
         
         // Retain the table UI by re-rendering
-        document.getElementById('delete-selected-files-btn').style.display = 'none';
+        const btn = document.getElementById('delete-selected-files-btn');
+        if (btn) btn.style.display = 'none';
         Admin.renderSchedulePreview();
         Admin.renderStorageMeter();
+    },
+
+    // Loading Overlay Helpers
+    showLoading: (title, status) => {
+        const overlay = document.getElementById('loading-overlay');
+        const titleEl = document.getElementById('loading-title');
+        const statusEl = document.getElementById('loading-status');
+        const barEl = document.getElementById('loading-bar');
+        
+        if (overlay) overlay.style.display = 'flex';
+        if (titleEl) titleEl.innerText = title || '処理中...';
+        if (statusEl) statusEl.innerText = status || 'しばらくお待ちください';
+        if (barEl) barEl.style.width = '0%';
+    },
+
+    updateLoading: (status, percent) => {
+        const statusEl = document.getElementById('loading-status');
+        const barEl = document.getElementById('loading-bar');
+        
+        if (statusEl) statusEl.innerText = status;
+        if (barEl) barEl.style.width = `${percent}%`;
+    },
+
+    hideLoading: () => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'none';
     }
 };

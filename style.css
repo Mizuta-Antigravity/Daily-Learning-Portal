@@ -242,9 +242,7 @@ main {
     gap: 1.5rem;
 }
 
-.left-pane {
     /* Normal vertical stacked layout on small screens */
-}
 
 @media (min-width: 850px) {
     .dashboard-layout {
@@ -486,4 +484,9 @@ th {
     border-color: var(--primary);
     outline: none;
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
