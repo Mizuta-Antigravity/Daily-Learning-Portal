@@ -437,7 +437,7 @@ const Admin = {
         Admin.showLoading('一括アップロード中...', `準備しています... (0/${maxFiles}件)`);
 
         let completed = 0;
-        const CONCURRENCY = 3; // Process 3 dates at a time
+        const CONCURRENCY = 6; // Process 6 dates at a time for better speed
         const totalToProcess = Math.min(maxFiles, targetDates.length);
         
         for (let i = 0; i < maxFiles; i += CONCURRENCY) {
@@ -491,7 +491,9 @@ const Admin = {
             return;
         }
 
-        // Only show next 30 days or filtered by month
+        // Optimization: Fetch all file metadata once using the Map version
+        const allFiles = await Utils.getAllFiles();
+
         let html = `
             <table class="glass">
                 <thead>
@@ -509,7 +511,6 @@ const Admin = {
                 <tbody>
         `;
 
-
         const academicSort = (a, b) => {
             const ma = parseInt(a.月), da = parseInt(a.日);
             const mb = parseInt(b.月), db = parseInt(b.日);
@@ -524,8 +525,8 @@ const Admin = {
             const m = date.getMonth() + 1;
             const d = date.getDate();
 
-            // Range filter: 4/1-12/1 and 1/1-3/31
-            const inRange = (m === 12 && d === 1) || (m >= 4 && m < 12) || (m >= 1 && m <= 3);
+            // Range filter: 4/1 - 3/31 (Fixed January 1st to December 31st bug)
+            const inRange = (m >= 4 && m <= 12) || (m >= 1 && m <= 3);
             if (!inRange) continue;
 
             // Period filter
@@ -535,8 +536,8 @@ const Admin = {
                 if (period && (dateStr < period.start || dateStr > period.end)) continue;
             }
 
-            const qFile = await Admin.checkFileExists(dateStr + '-Q');
-            const aFile = await Admin.checkFileExists(dateStr + '-A');
+            const qFile = allFiles.has(dateStr + '-Q');
+            const aFile = allFiles.has(dateStr + '-A');
 
             html += `
                 <tr>
@@ -548,8 +549,8 @@ const Admin = {
                     <td>${item.行事名}</td>
                     <td>
                         <select onchange="Admin.updateImplementationStatus('${dateStr}', this.value)" style="width: auto; padding: 0.2rem; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: var(--text-main);">
-                            <option value="1" ${item.実施有無 == 1 ? 'selected' : ''}>実施</option>
-                            <option value="0" ${item.実施有無 == 0 ? 'selected' : ''}>なし</option>
+                            <option value="1" ${String(item.実施有無) === '1' ? 'selected' : ''}>実施</option>
+                            <option value="0" ${String(item.実施有無) === '0' ? 'selected' : ''}>なし</option>
                         </select>
                     </td>
                     <td>${qFile ? '✅' : 'ー'}</td>
@@ -631,26 +632,36 @@ const Admin = {
         Admin.showLoading('ファイルを削除中...', `準備しています... (0/${total}件)`);
         
         let completed = 0;
-        // Processing deletion
-        for (const cb of checkboxes) {
-            const dateStr = cb.getAttribute('data-date');
-            await Utils.deleteFile(`${dateStr}-Q`);
-            await Utils.deleteFile(`${dateStr}-A`);
-            
-            // Revert the downloaded (completed) status
-            try {
-                let downloaded = JSON.parse(localStorage.getItem('downloaded_days') || '[]');
-                if (downloaded.includes(dateStr)) {
-                    downloaded = downloaded.filter(d => d !== dateStr);
-                    localStorage.setItem('downloaded_days', JSON.stringify(downloaded));
-                }
-            } catch (e) {
-                console.error('Failed to parse downloaded_days from localStorage:', e);
+        const CONCURRENCY = 8; // Faster deletion
+        
+        // Processing deletion in batches
+        for (let i = 0; i < total; i += CONCURRENCY) {
+            const batch = [];
+            for (let j = 0; j < CONCURRENCY && (i + j) < total; j++) {
+                const cb = checkboxes[i + j];
+                const dateStr = cb.getAttribute('data-date');
+                
+                batch.push((async () => {
+                    await Utils.deleteFile(`${dateStr}-Q`);
+                    await Utils.deleteFile(`${dateStr}-A`);
+                    
+                    // Revert the downloaded (completed) status
+                    try {
+                        let downloaded = JSON.parse(localStorage.getItem('downloaded_days') || '[]');
+                        if (downloaded.includes(dateStr)) {
+                            downloaded = downloaded.filter(d => d !== dateStr);
+                            localStorage.setItem('downloaded_days', JSON.stringify(downloaded));
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse downloaded_days from localStorage:', e);
+                    }
+                    
+                    completed++;
+                    const percent = Math.round((completed / total) * 100);
+                    Admin.updateLoading(`削除中... (${completed}/${total}件)`, percent);
+                })());
             }
-            
-            completed++;
-            const percent = Math.round((completed / total) * 100);
-            Admin.updateLoading(`削除中... (${completed}/${total}件)`, percent);
+            await Promise.all(batch);
         }
 
         Admin.hideLoading();
