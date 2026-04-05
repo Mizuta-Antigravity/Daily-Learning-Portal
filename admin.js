@@ -246,6 +246,7 @@ const Admin = {
                 email,
                 name: item['生徒の名前'],
                 class: item['クラス'],
+                attendance: item['出席番'],
                 password: 'DLP2026',
                 pw_changed: false
             }, { merge: true });
