@@ -314,27 +314,42 @@ const Student = {
         }
     },
 
-    downloadFile: async (id) => {
-        const fileData = await Utils.getFile(id);
-        if (!fileData) return alert('ファイルがありません');
+    downloadFile: (id) => {
+        // Use synchronous cache access to preserve user gesture context (essential for Safari/iOS)
+        const fileData = Student.cachedFiles ? Student.cachedFiles.get(id) : null;
         
-        // Track download
+        if (!fileData) {
+            // Fallback if not in cache (popup blocker might trigger if this is slow)
+            Utils.getFile(id).then(data => {
+                if (data && data.url) {
+                    window.open(data.url, '_blank');
+                    Student.markFileDownloaded(id);
+                } else {
+                    alert('ファイルが存在しないか、読み込めませんでした');
+                }
+            });
+            return;
+        }
+
+        // Trigger opening in a new tab immediately (synchronous action is allowed by Safari)
+        window.open(fileData.url, '_blank');
+        Student.markFileDownloaded(id);
+    },
+
+    markFileDownloaded: (id) => {
         const dateStr = id.replace(/-[QA]$/, '');
-        const downloaded = JSON.parse(localStorage.getItem('downloaded_days') || '[]');
+        let downloaded = [];
+        try {
+            downloaded = JSON.parse(localStorage.getItem('downloaded_days') || '[]');
+        } catch(e) {
+            downloaded = [];
+        }
+        
         if (!downloaded.includes(dateStr)) {
             downloaded.push(dateStr);
             localStorage.setItem('downloaded_days', JSON.stringify(downloaded));
             Student.renderSchedule();
         }
-
-        // Use Firebase download URL natively
-        const a = document.createElement('a');
-        a.href = fileData.url;
-        a.target = '_blank';
-        a.download = fileData.name || id;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
     },
 
     updateReminder: async (dateId) => {

@@ -182,7 +182,12 @@ button {
 
 button:hover {
     background: var(--primary-hover);
-    transform: translateY(-1px);
+}
+
+@media (hover: hover) {
+    button:hover {
+        transform: translateY(-1px);
+    }
 }
 
 @keyframes fadeIn {
@@ -292,8 +297,10 @@ main {
     transition: transform 0.3s;
 }
 
-.card:hover {
-    transform: translateY(-4px);
+@media (hover: hover) {
+    .card:hover {
+        transform: translateY(-4px);
+    }
 }
 
 .status-badge {
@@ -384,8 +391,10 @@ th {
     color: #ffcc55; /* Highlight the title text too */
 }
 
-.card.today:hover {
-    transform: scale(1.08);
+@media (hover: hover) {
+    .card.today:hover {
+        transform: scale(1.08);
+    }
 }
 
 .card.small-day {
@@ -393,9 +402,11 @@ th {
     transform: scale(0.95);
 }
 
-.card.small-day:hover {
-    opacity: 1;
-    transform: scale(1);
+@media (hover: hover) {
+    .card.small-day:hover {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .card.downloaded {
