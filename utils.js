@@ -47,6 +47,20 @@ const Utils = {
         }
     },
 
+    getAllFiles: async () => {
+        try {
+            const snapshot = await db.collection('files').get();
+            const results = new Map();
+            snapshot.forEach(doc => {
+                results.set(doc.id, doc.data());
+            });
+            return results;
+        } catch (e) {
+            console.error('Error fetching all files:', e);
+            return new Map();
+        }
+    },
+
     deleteFile: async (id) => {
         try {
             const doc = await db.collection('files').doc(id).get();

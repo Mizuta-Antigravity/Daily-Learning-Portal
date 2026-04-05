@@ -1,5 +1,7 @@
 const Student = {
     currentPeriod: null,
+    cachedSchedule: null,
+    cachedFiles: null,
 
     init: async () => {
         await Student.setupPeriodSelector();
@@ -7,7 +9,10 @@ const Student = {
     },
 
     setupPeriodSelector: async () => {
-        const schedule = await Utils.getAllSchedule();
+        if (!Student.cachedSchedule) {
+            Student.cachedSchedule = await Utils.getAllSchedule();
+        }
+        const schedule = Student.cachedSchedule;
         const periods = Utils.identifyPeriods(schedule);
         const selector = document.getElementById('student-period-select');
         
@@ -26,9 +31,25 @@ const Student = {
     },
 
     renderSchedule: async (autoScroll = false) => {
-        const schedule = await Utils.getAllSchedule();
         const container = document.getElementById('schedule-list');
+        
+        // Show loading state if it's the first time
+        if (!Student.cachedSchedule || !Student.cachedFiles) {
+            container.innerHTML = '<p class="glass" style="padding: 2rem; grid-column: 1/-1;">データを読み込んでいます...<br><span style="font-size: 0.8rem; color: var(--text-muted);">行事予定とファイル情報を同期中</span></p>';
+        }
 
+        // Parallel fetch for first time
+        if (!Student.cachedSchedule || !Student.cachedFiles) {
+            const [scheduleData, filesData] = await Promise.all([
+                Utils.getAllSchedule(),
+                Utils.getAllFiles()
+            ]);
+            Student.cachedSchedule = scheduleData;
+            Student.cachedFiles = filesData;
+        }
+
+        const schedule = Student.cachedSchedule;
+        const filesMap = Student.cachedFiles;
         const now = new Date();
         
         if (schedule.length === 0) {
@@ -66,7 +87,9 @@ const Student = {
             return rankA - rankB;
         };
 
-        for (let item of schedule.sort(academicSort)) {
+        const sortedSchedule = [...schedule].sort(academicSort);
+
+        for (let item of sortedSchedule) {
             const dateStr = item.id;
             const date = new Date(dateStr);
             const m = date.getMonth() + 1;
@@ -82,11 +105,8 @@ const Student = {
                 if (period && (dateStr < period.start || dateStr > period.end)) continue;
             }
 
-            let qFile = null, aFile = null;
-            try {
-                qFile = await Utils.getFile(dateStr + '-Q');
-                aFile = await Utils.getFile(dateStr + '-A');
-            } catch(e) { }
+            const qFile = filesMap.get(dateStr + '-Q');
+            const aFile = filesMap.get(dateStr + '-A');
             
             const reminder = reminders.find(r => r.id === dateStr);
 
