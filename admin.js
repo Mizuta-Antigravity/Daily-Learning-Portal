@@ -246,8 +246,7 @@ const Admin = {
                 email,
                 name: item['生徒の名前'],
                 class: item['クラス'],
-                attendance: item['出席番'],
-                password: 'GE12345',
+                password: 'DLP2026',
                 pw_changed: false
             }, { merge: true });
         });
@@ -367,7 +366,7 @@ const Admin = {
         checkboxes.forEach(cb => {
             const email = cb.getAttribute('data-email');
             batch.update(db.collection('users').doc(email), {
-                password: 'GE12345',
+                password: 'DLP2026',
                 pw_changed: false
             });
         });
