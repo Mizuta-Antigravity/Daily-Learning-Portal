@@ -361,19 +361,22 @@ const Admin = {
         const checkboxes = document.querySelectorAll('.student-cb:checked');
         if (checkboxes.length === 0) return;
         
-        if (!confirm(`選択した ${checkboxes.length} 名のパスワードを「GE12345」にリセットします。よろしいですか？`)) return;
+        const newPassword = prompt(`選択した ${checkboxes.length} 名のパスワードをリセットします。新しい共通パスワードを入力してください (例: DLP2026):`, "DLP2026");
         
+        if (!newPassword || newPassword.trim() === "") return;
+        if (newPassword.length < 6) return alert('パスワードは6文字以上で入力してください。');
+
         const batch = db.batch();
         checkboxes.forEach(cb => {
             const email = cb.getAttribute('data-email');
             batch.update(db.collection('users').doc(email), {
-                password: 'DLP2026',
+                password: newPassword,
                 pw_changed: false
             });
         });
         
         await batch.commit();
-        alert('パスワードをリセットしました');
+        alert(`パスワードを「${newPassword}」に変更しました。`);
         Admin.renderStudentList();
     },
 
