@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>毎日学習 | Daily Learning @Hokuyo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Auth View -->
+        <section id="auth-view" style="display: none;">
+            <div id="auth-container">
+                <div class="auth-card glass">
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" id="tab-student">生徒用</button>
+                        <button class="auth-tab" id="tab-admin">管理者用</button>
+                    </div>
+                    <h1 id="auth-title">ログイン</h1>
+                    <p class="subtitle" id="auth-subtitle">Daily Learning Portal</p>
+                    
+                    <div id="login-form">
+                        <div class="form-group">
+                            <label for="email-prefix" id="id-label">メールアドレス (ID)</label>
+                            <div class="input-group">
+                                <input type="text" id="email-prefix" placeholder="xxxxxxxx">
+                                <span class="domain-suffix" id="email-domain">@hokuyo2.kansai-u.ac.jp</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">パスワード</label>
+                            <input type="password" id="password" placeholder="••••••••">
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="show-password">
+                            <label for="show-password">パスワードを表示</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="remember-me">
+                            <label for="remember-me">ログイン情報を保存する</label>
+                        </div>
+                        <button id="login-btn">ログイン</button>
+                        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem;">
+                            <a href="#" id="forgot-password-link" style="color: var(--primary); text-decoration: none;">パスワードを忘れましたか？</a>
+                        </p>
+                    </div>
+
+                    <!-- Password Change Form (Hidden initially) -->
+                    <div id="pw-change-form" style="display: none;">
+                        <p class="subtitle">初回ログインのためパスワードを変更してください</p>
+                        <div class="form-group">
+                            <label for="new-password">新しいパスワード</label>
+                            <input type="password" id="new-password" placeholder="新しいパスワード">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">パスワードの確認</label>
+                            <input type="password" id="confirm-password" placeholder="パスワードの確認">
+                        </div>
+                        <button id="change-pw-btn">パスワードを変更して保存</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Portal View -->
+        <section id="portal-view" style="display: none;">
+            <header>
+                <div class="logo" style="display: flex; align-items: center; gap: 0.8rem;">
+                    <h2 style="font-size: 1.25rem; margin: 0;">毎日学習</h2>
+                    <span onclick="document.getElementById('about-modal').style.display='flex'" style="cursor: pointer; font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.1); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid var(--glass-border); font-weight: 500; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">v0.1.6</span>
+                    <button id="admin-manual-btn" onclick="document.getElementById('manual-modal').style.display='flex'" style="display: none; cursor: pointer; font-size: 0.75rem; color: var(--primary); background: rgba(99, 102, 241, 0.1); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.3); font-weight: bold; transition: background 0.2s; width: auto;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'" onmouseout="this.style.background='rgba(99, 102, 241, 0.1)'">⚙️ 設定マニュアル</button>
+                </div>
+                
+                <div style="display: flex; flex: 1; justify-content: center; align-items: center; gap: 2rem;">
+                    <nav class="nav-links" id="admin-nav" style="display: none;">
+                        <button id="nav-student" class="nav-btn active">生徒サイト</button>
+                        <button id="nav-admin" class="nav-btn">管理者サイト</button>
+                    </nav>
+
+                    <div id="student-header-controls" style="display: none; align-items: center; gap: 1rem;">
+                        <label for="student-period-select" style="margin-bottom: 0; font-weight: bold; color: var(--text-muted); font-size: 0.9rem;">🗓️ 表示期間:</label>
+                        <select id="student-period-select" style="width: auto; min-width: 200px; padding: 0.5rem 1rem; border-radius: 8px; background: rgba(255,255,255,0.1); color: white; border: 1px solid var(--glass-border); font-weight: bold; font-size: 0.95rem; cursor: pointer;"></select>
+                    </div>
+                </div>
+
+                <div class="user-info">
+                    <span id="user-display-name" style="margin-right: 1rem; font-size: 0.875rem; color: var(--text-muted);"></span>
+                    <button id="logout-btn" style="width: auto; padding: 0.4rem 0.8rem; background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2);">ログアウト</button>
+                </div>
+            </header>
+
+            <main>
+                <!-- Student View -->
+                <div id="student-container">
+                    <div id="student-dashboard" class="dashboard-layout">
+                        <!-- Left pane: Today's tasks (sticky on large screens) -->
+                        <div id="today-panel" class="left-pane"></div>
+                        
+                        <!-- Right pane: Scrollable timeline of past and future -->
+                        <div id="schedule-list" class="right-pane grid">
+                            <!-- Iterated items go here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin View -->
+                <div id="admin-container" style="display: none;">
+                    <div id="april-alert" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-left: 6px solid var(--error); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                        <h4 style="color: var(--error); margin: 0 0 0.5rem 0;">🌸 新年度が始まりました！</h4>
+                        <p style="margin: 0; font-size: 0.9rem; color: var(--text-main);">クラウドストレージの無料容量（5.0 GB）を確保するため、画面下の「行事予定プレビュー」から、昨年度の古いファイルにチェックを入れて一括削除することをおすすめします。</p>
+                    </div>
+
+                    <div id="storage-meter-container" class="card glass" style="margin-bottom: 1.5rem; padding: 1.2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 0.8rem;">
+                            <div>
+                                <h4 style="margin: 0; margin-bottom: 0.2rem;">クラウドストレージ使用状況</h4>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">アップロード済みファイル ＋ プログラム本体の概算合計</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <strong id="storage-used-text" style="font-size: 1.25rem; color: var(--primary);">計算中...</strong>
+                            </div>
+                        </div>
+                        <div style="width: 100%; background: rgba(0,0,0,0.05); border-radius: 8px; height: 12px; overflow: hidden; border: 1px solid var(--glass-border);">
+                            <div id="storage-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); transition: width 1s ease-out;"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid">
+                        <!-- Student CSV Import -->
+                        <div class="card glass">
+                            <h4>生徒情報インポート</h4>
+                            <p class="subtitle">CSV形式で生徒情報を一括登録します</p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <input type="file" id="csv-students" accept=".csv" style="display: none;">
+                                <button onclick="document.getElementById('csv-students').click()" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.2);">CSVを選択</button>
+                                <button onclick="Admin.downloadTemplate('student')" style="background: transparent; color: var(--text-muted); border: 1px solid var(--glass-border); width: auto;">テンプレート</button>
+                            </div>
+                        </div>
+
+                        <!-- Schedule CSV Import -->
+                        <div class="card glass">
+                            <h4>行事予定インポート</h4>
+                            <p class="subtitle">CSV形式で行事予定を登録します</p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <input type="file" id="csv-events" accept=".csv" style="display: none;">
+                                <button onclick="document.getElementById('csv-events').click()" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.2);">CSVを選択</button>
+                                <button onclick="Admin.downloadTemplate('schedule')" style="background: transparent; color: var(--text-muted); border: 1px solid var(--glass-border); width: auto;">テンプレート</button>
+                            </div>
+                        </div>
+
+                        <!-- Sequential File Upload -->
+                        <div class="card glass" style="grid-column: 1 / -1;">
+                            <h4>一括ファイルアップロード</h4>
+                            <p class="subtitle">フォルダ内の連番ファイルを各実施日に自動割り当てします</p>
+                            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                <div style="flex: 1;">
+                                    <label>問題ファイル (フォルダ内全選択)</label>
+                                    <input type="file" id="bulk-questions" multiple style="margin-top: 0.5rem; display: block;">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label>解答ファイル (フォルダ内全選択)</label>
+                                    <input type="file" id="bulk-answers" multiple style="margin-top: 0.5rem; display: block;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 1.5rem;">
+                                <label>対象月</label>
+                                <input type="month" id="upload-month" style="width: 200px;">
+                                <button id="process-bulk-upload" style="width: auto; padding: 0.5rem 1.5rem; margin-left: 1rem;">処理の実行</button>
+                            </div>
+                        </div>
+
+                        <!-- Excel to CSV Conversion Tool -->
+                        <div class="card glass" style="grid-column: 1 / -1; border: 1px dashed var(--primary);">
+                            <h4>行事予定 Excel → 統合CSV 変換</h4>
+                            <p class="subtitle">Excelファイルを読み込み、同日の予定を統合したインポート用CSVを作成します</p>
+                            <input type="file" id="excel-to-csv-input" accept=".xlsx, .xls" style="display: none;">
+                            <button onclick="document.getElementById('excel-to-csv-input').click()" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
+                                Excelファイルを選択して変換・保存
+                            </button>
+                            <p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">
+                                ※ 同じ日付の行事名は自動的にカンマで連結されます
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Student List -->
+                    <div id="admin-student-list" style="margin-top: 2rem;">
+                        <h4>インポート済み生徒一覧</h4>
+                        <div id="student-table-container">
+                            <!-- User table will go here -->
+                        </div>
+                    </div>
+
+                    <!-- Schedule Preview / Manual Upload -->
+                    <div id="admin-period-controls" style="margin-top: 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <label for="admin-period-select">表示期間:</label>
+                            <select id="admin-period-select" style="width: auto; min-width: 200px; padding: 0.5rem;"></select>
+                        </div>
+                        <button id="delete-selected-files-btn" onclick="Admin.deleteSelectedFiles()" style="display: none; background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); width: auto; font-size: 0.9rem; padding: 0.5rem 1rem;">🗑️ 選択したファイルを削除</button>
+                    </div>
+                    <div id="admin-schedule-preview" style="margin-top: 1rem;">
+                        <!-- Table of schedule will go here -->
+                    </div>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <!-- Modal for Holiday selection -->
+    <div id="calendar-modal" class="glass" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);">
+        <div class="calendar-content">
+            <h4 id="calendar-title">日付を選択</h4>
+            <div id="calendar-grid"></div>
+            <button id="close-modal">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Modal for About App -->
+    <div id="about-modal" class="glass" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);">
+        <div class="calendar-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; color: var(--text-main);">毎日学習アプリ</h3>
+            <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+                本システムは、生徒の皆様が日々の問題プリント・解答をスムーズに取得・管理し、学習計画を立てるためのポータルアプリです。<br>
+                iPadなどタブレット端末での利用に最適化されています。
+            </p>
+
+            <h4 style="margin-bottom: 0.8rem; color: var(--text-main);">バージョン履歴</h4>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.8rem;">
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--primary); font-size: 1rem;">v0.1.6</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>ストレージ使用量の可視化（メーター表示）機能を追加</li>
+                        <li>新年度（4月）のデータお掃除アラート機能を追加</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.5</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>管理者画面でアップロードファイルを削除した際、生徒の「完了（済）マーク」等を自動リセットするように修正</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.4</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>管理者画面における、アップロード済みファイルの選択削除機能追加</li>
+                        <li>行事予定の並び順を常に「4月始まり」で固定表示するように修正</li>
+                        <li>マニュアルにアップロード時ファイル名の優先度ルールを明記</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.3</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>「実施なし」状態の判定強化と不要アイコンの非表示対応</li>
+                        <li>アプリ情報のモーダル追加および設定マニュアルの整備</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.2</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/03</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>iPad向けUIの改善（Todayカードの大画面化、縦型ヒーローレイアウト）</li>
+                        <li>タイムライン表示の現在地アンカーおよび自動スクロール機能追加</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.1</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/03</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>行事予定Excelの読込とCSV自動変換ツールを追加</li>
+                        <li>同日に複数予定がある場合の結合処理および自動設定ロジックの実装</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.1.0</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/03</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>生徒用・管理者用ポータルの初期リリース</li>
+                        <li>行事予定・生徒データのインポート機能、ファイル割り当て機能</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button onclick="document.getElementById('about-modal').style.display='none'" style="width: 100%; border-radius: 8px;">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Modal for Admin Manual -->
+    <div id="manual-modal" class="glass" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);">
+        <div class="calendar-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
+            <h3 style="margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; color: var(--text-main);">⚙️ 管理者設定マニュアル</h3>
+            
+            <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <h4 style="color: var(--text-main); margin-bottom: 0.5rem;">1. Excelから行事予定をCSVに変換する</h4>
+                    <p style="line-height: 1.6;">
+                        「行事予定 Excel → 統合CSV 変換」から学校のエクセルファイルを選択します。<br>
+                        同日の行事はカンマ（,）で自動結合され、インポート用CSVとして保存されます。
+                    </p>
+                </div>
+                <div>
+                    <h4 style="color: var(--text-main); margin-bottom: 0.5rem;">2. 行事予定・生徒情報の登録</h4>
+                    <p style="line-height: 1.6;">
+                        ① 上記で変換したCSVを「行事予定インポート」からアップロードします。<br>
+                        ② 生徒リストCSV（テンプレートあり）をアップロードします。<br>
+                        これでタイムラインの土台が作成されます。
+                    </p>
+                </div>
+                <div>
+                    <h4 style="color: var(--text-main); margin-bottom: 0.5rem;">3. 問題・解答ファイルの一括アップロード設定</h4>
+                    <p style="line-height: 1.6;">
+                        裁断・作成したPDFファイル等をフォルダにまとめて入れ、一括アップロードツールを使用します。<br>
+                        月を指定して「自動処理」を実行すると、その月にある「実施日」に対して順番にファイルが割り当てられ保存されます。<br>
+                        <br>
+                        <strong style="color: #ffaa00;">【ファイル名のルール】</strong><br>
+                        アップロードされたファイルは、システム側で<strong>「ファイル名に含まれる数字（半角）」が小さい順に自動で並び替え</strong>られ、日付順に割り当てられます。<br>
+                        例：「1.pdf」「第2回.pdf」「lesson-3.pdf」... など、名前の中に数字が入っていれば、その順番通りに第1回実施日、第2回実施日へと処理されます。
+                    </p>
+                </div>
+            </div>
+
+            <button onclick="document.getElementById('manual-modal').style.display='none'" style="width: 100%; border-radius: 8px;">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Setup -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
+    
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyAnEvwhdP5b1Nexi_M8t8lWOXz1f9DN-KY",
+        authDomain: "daily-learning-portal.firebaseapp.com",
+        projectId: "daily-learning-portal",
+        storageBucket: "daily-learning-portal.firebasestorage.app",
+        messagingSenderId: "272805568311",
+        appId: "1:272805568311:web:1e4a703d684ad4673304b2"
+      };
+      
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+      const storage = firebase.storage();
+    </script>
+
+    <script src="utils.js"></script>
+    <script src="admin.js"></script>
+    <script src="student.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
