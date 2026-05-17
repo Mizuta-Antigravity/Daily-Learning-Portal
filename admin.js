@@ -237,29 +237,52 @@ const Admin = {
         const text = await file.text();
         const data = Utils.parseCSV(text);
         
-        const batch = db.batch();
-        data.forEach(item => {
-            const email = item['メールアドレス'];
-            const docRef = db.collection('users').doc(email);
-            batch.set(docRef, {
-                id: email,
-                email,
-                name: item['生徒の名前'],
-                class: item['クラス'],
-                attendance: item['出席番'],
-                password: 'DLP2026',
-                pw_changed: false
-            }, { merge: true });
-        });
-        
+        Admin.showLoading('生徒情報をインポート中...', '認証アカウントを作成しています...');
+
         try {
+            const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
+            let completed = 0;
+            const batch = db.batch();
+            
+            for (const item of data) {
+                const email = item['メールアドレス'];
+                if (!email) continue;
+                
+                try {
+                    await secondaryApp.auth().createUserWithEmailAndPassword(email, 'DLP2026');
+                } catch (err) {
+                    if (err.code !== 'auth/email-already-in-use') {
+                        console.error('Auth creation failed for', email, err);
+                    }
+                }
+                
+                const docRef = db.collection('users').doc(email);
+                batch.set(docRef, {
+                    id: email,
+                    email,
+                    name: item['生徒の名前'],
+                    class: item['クラス'],
+                    attendance: item['出席番'],
+                    pw_changed: false
+                }, { merge: true });
+                
+                completed++;
+                const percent = Math.round((completed / data.length) * 100);
+                Admin.updateLoading(`インポート中... (${completed}/${data.length}件)`, percent);
+            }
+            
+            await secondaryApp.delete();
             await batch.commit();
+            
+            Admin.hideLoading();
             alert(`${data.length}名の生徒情報をインポートしました`);
             Admin.renderStudentList();
         } catch (e) {
+            Admin.hideLoading();
             console.error('Error importing students:', e);
             alert('生徒情報のインポートに失敗しました。');
         }
+        e.target.value = '';
     },
 
     renderStudentList: async () => {
@@ -344,7 +367,7 @@ const Admin = {
         const checkboxes = document.querySelectorAll('.student-cb:checked');
         if (checkboxes.length === 0) return;
         
-        if (!confirm(`選択した ${checkboxes.length} 名の生徒を削除してもよろしいですか？`)) return;
+        if (!confirm(`選択した ${checkboxes.length} 名の生徒データを削除してもよろしいですか？\n\n【重要】Firebase Auth（認証用アカウント）はここから削除できません。完全にアカウントを消去するには、Firebase ConsoleのAuthentication画面から手動で削除してください。`)) return;
         
         const batch = db.batch();
         checkboxes.forEach(cb => {
@@ -353,7 +376,7 @@ const Admin = {
         });
         
         await batch.commit();
-        alert('削除しました');
+        alert('名簿データ（Firestore）から削除しました。Authからの削除はコンソールで行ってください。');
         Admin.renderStudentList();
     },
 
@@ -361,22 +384,24 @@ const Admin = {
         const checkboxes = document.querySelectorAll('.student-cb:checked');
         if (checkboxes.length === 0) return;
         
-        const newPassword = prompt(`選択した ${checkboxes.length} 名のパスワードをリセットします。新しい共通パスワードを入力してください (例: DLP2026):`, "DLP2026");
-        
-        if (!newPassword || newPassword.trim() === "") return;
-        if (newPassword.length < 6) return alert('パスワードは6文字以上で入力してください。');
+        if (!confirm(`選択した ${checkboxes.length} 名の生徒へ、パスワード再設定用のメールを送信しますか？\n(注意: Firebase Authでは管理者が任意のパスワードに書き換えることはできません)`)) return;
 
-        const batch = db.batch();
-        checkboxes.forEach(cb => {
-            const email = cb.getAttribute('data-email');
-            batch.update(db.collection('users').doc(email), {
-                password: newPassword,
-                pw_changed: false
-            });
-        });
+        Admin.showLoading('メール送信中...', 'お待ちください...');
         
-        await batch.commit();
-        alert(`パスワードを「${newPassword}」に変更しました。`);
+        let successCount = 0;
+        for (const cb of checkboxes) {
+            const email = cb.getAttribute('data-email');
+            try {
+                await auth.sendPasswordResetEmail(email);
+                await db.collection('users').doc(email).update({ pw_changed: false });
+                successCount++;
+            } catch (e) {
+                console.error('Error sending reset email to', email, e);
+            }
+        }
+        
+        Admin.hideLoading();
+        alert(`${successCount} 件の再設定メールを送信しました。`);
         Admin.renderStudentList();
     },
 

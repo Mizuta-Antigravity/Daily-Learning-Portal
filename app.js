@@ -5,10 +5,40 @@ const App = {
     isAdmin: false,
 
     init: async () => {
-        // DB init natively handled by Firebase Global
         App.setupEventListeners();
         App.checkRememberMe();
-        App.render();
+        
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                if (user.email === 'admin@hokuyo2.kansai-u.ac.jp' || user.email === 'admin') {
+                    const adminUser = { name: '管理者', is_admin: true, email: user.email };
+                    App.loginSuccess(adminUser, false, null, 'admin');
+                } else {
+                    try {
+                        const doc = await db.collection('users').doc(user.email).get();
+                        if (doc.exists) {
+                            const dbUser = doc.data();
+                            if (!dbUser.pw_changed) {
+                                document.getElementById('login-form').style.display = 'none';
+                                document.getElementById('pw-change-form').style.display = 'block';
+                                App.currentUser = dbUser;
+                                return;
+                            }
+                            App.loginSuccess(dbUser, false, null, 'student');
+                        } else {
+                            auth.signOut();
+                        }
+                    } catch (e) {
+                        console.error('Error fetching user data', e);
+                    }
+                }
+            } else {
+                if (!App.currentUser && App.currentView !== 'auth') {
+                    App.currentView = 'auth';
+                }
+                App.render();
+            }
+        });
     },
 
     setupEventListeners: () => {
@@ -52,54 +82,26 @@ const App = {
 
         if (!prefix || !password) return alert('IDとパスワードを入力してください');
 
-        if (App.authTab === 'admin') {
-            // Admin login logic
-            if (prefix === 'admin' && password === 'admin123') {
-                const user = { name: '管理者', is_admin: true, email: 'admin' };
-                App.loginSuccess(user, remember, password, 'admin');
-                return;
-            } else {
-                return alert('管理者IDまたはパスワードが正しくありません');
-            }
-        }
+        const email = App.authTab === 'admin' ? 
+            (prefix === 'admin' ? 'admin@hokuyo2.kansai-u.ac.jp' : prefix) : 
+            `${prefix}@hokuyo2.kansai-u.ac.jp`;
 
-        // Student check
-        const email = `${prefix}@hokuyo2.kansai-u.ac.jp`;
-        
-        // Find user in DB or allow if prefix exists (Mock lookup)
         try {
-            const doc = await db.collection('users').doc(email).get();
-            const user = doc.exists ? doc.data() : null;
+            await firebase.auth().setPersistence(
+                remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION
+            );
             
-            // If user not found, we'll check if they are in the CSV uploaded list or just mock it
-            if (user) {
-                if (user.password === password) {
-                    if (password === 'GE12345' && !user.pw_changed) {
-                        // Force password change
-                        document.getElementById('login-form').style.display = 'none';
-                        document.getElementById('pw-change-form').style.display = 'block';
-                        App.currentUser = user;
-                        return;
-                    }
-                    App.loginSuccess(user, remember, password);
-                } else {
-                    alert('パスワードが違います');
-                }
+            if (remember) {
+                localStorage.setItem('rememberUser', JSON.stringify({ prefix, password }));
             } else {
-                // If user not in DB, but it's the initial password, let them in (Mock registration)
-                if (password === 'GE12345') {
-                    const newUser = { id: email, email, name: '生徒', password: 'GE12345', pw_changed: false };
-                    document.getElementById('login-form').style.display = 'none';
-                    document.getElementById('pw-change-form').style.display = 'block';
-                    App.currentUser = newUser;
-                    alert('初回ログインです。パスワードを変更してください。');
-                } else {
-                    alert('ユーザーが見つかりません');
-                }
+                localStorage.removeItem('rememberUser');
             }
+
+            await auth.signInWithEmailAndPassword(email, password);
+            // onAuthStateChanged will handle the rest
         } catch (e) {
-            console.error('Error fetching user', e);
-            alert('ログインサーバーとの通信に失敗しました');
+            console.error('Error logging in', e);
+            alert('ログインに失敗しました。IDまたはパスワードが間違っています。');
         }
     },
 
@@ -108,13 +110,6 @@ const App = {
         App.currentView = view;
         App.isAdmin = user.is_admin || false;
         
-        if (remember) {
-            const prefix = user.email.includes('@') ? user.email.split('@')[0] : user.email;
-            localStorage.setItem('rememberUser', JSON.stringify({ prefix, password }));
-        } else {
-            localStorage.removeItem('rememberUser');
-        }
-
         App.render();
     },
 
@@ -126,25 +121,47 @@ const App = {
         if (newPw !== confirmPw) return alert('パスワードが一致しません');
 
         try {
-            App.currentUser.password = newPw;
+            await auth.currentUser.updatePassword(newPw);
+            
             App.currentUser.pw_changed = true;
-            await db.collection('users').doc(App.currentUser.email).set(App.currentUser);
+            await db.collection('users').doc(App.currentUser.email).set({
+                ...App.currentUser,
+                password: firebase.firestore.FieldValue.delete()
+            }, { merge: true });
             
             alert('パスワードを変更しました');
-            App.loginSuccess(App.currentUser, false, '');
+            App.loginSuccess(App.currentUser, false, '', 'student');
         } catch (e) {
             console.error('Error updating password', e);
-            alert('パスワードの更新に失敗しました');
+            if (e.code === 'auth/requires-recent-login') {
+                alert('セキュリティのため、一度ログアウトして再ログインしてからパスワードを変更してください');
+            } else {
+                alert('パスワードの更新に失敗しました: ' + e.message);
+            }
         }
     },
 
-    handleForgotPassword: () => {
+    handleForgotPassword: async () => {
         const prefix = document.getElementById('email-prefix').value;
         if (!prefix) return alert('メールアドレスの接頭辞を入力してください');
-        alert(`${prefix}@hokuyo2.kansai-u.ac.jp 宛に再設定メールを送信しました（シミュレーション）`);
+        const email = App.authTab === 'admin' ? 
+            (prefix === 'admin' ? 'admin@hokuyo2.kansai-u.ac.jp' : prefix) : 
+            `${prefix}@hokuyo2.kansai-u.ac.jp`;
+            
+        try {
+            await auth.sendPasswordResetEmail(email);
+            alert(`${email} 宛にパスワード再設定メールを送信しました`);
+        } catch(e) {
+            alert('再設定メールの送信に失敗しました');
+        }
     },
 
-    handleLogout: () => {
+    handleLogout: async () => {
+        try {
+            await auth.signOut();
+        } catch (e) {
+            console.error(e);
+        }
         App.currentUser = null;
         App.currentView = 'auth';
         App.render();
