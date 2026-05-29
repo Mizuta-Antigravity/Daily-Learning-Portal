@@ -76,7 +76,7 @@
             <header>
                 <div class="logo" style="display: flex; align-items: center; gap: 0.8rem;">
                     <h2 style="font-size: 1.25rem; margin: 0;">毎日学習 <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">daily-learning-portal</span></h2>
-                    <span onclick="document.getElementById('about-modal').style.display='flex'" style="cursor: pointer; font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.1); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid var(--glass-border); font-weight: 500; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">v0.2.4</span>
+                    <span onclick="document.getElementById('about-modal').style.display='flex'" style="cursor: pointer; font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.1); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid var(--glass-border); font-weight: 500; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">v0.3.0</span>
                     <button id="admin-manual-btn" onclick="document.getElementById('manual-modal').style.display='flex'" style="display: none; cursor: pointer; font-size: 0.75rem; color: var(--primary); background: rgba(99, 102, 241, 0.1); padding: 0.2rem 0.6rem; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.3); font-weight: bold; transition: background 0.2s; width: auto;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'" onmouseout="this.style.background='rgba(99, 102, 241, 0.1)'">⚙️ 設定マニュアル</button>
                 </div>
                 
@@ -102,12 +102,99 @@
                 <!-- Student View -->
                 <div id="student-container">
                     <div id="student-dashboard" class="dashboard-layout">
-                        <!-- Left pane: Today's tasks (sticky on large screens) -->
-                        <div id="today-panel" class="left-pane"></div>
+                        <!-- Left pane: stays visible always, sticky on large screens -->
+                        <div class="left-pane" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- Today's tasks (rendered by student.js) -->
+                            <div id="today-panel" style="width: 100%;"></div>
+                            
+                            <!-- Student View Tabs (placed below Today's card) -->
+                            <div class="student-tabs glass" style="display: flex; gap: 0.5rem; padding: 0.35rem; border-radius: 12px; width: 100%;">
+                                <button class="student-tab active" id="tab-daily-learning" style="flex: 1; padding: 0.6rem 1rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">🗓️ 日々の学習</button>
+                                <button class="student-tab" id="tab-exam-progress" style="flex: 1; padding: 0.6rem 1rem; background: transparent; color: var(--text-muted); border: none; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">🎓 受験対策・単元進捗</button>
+                            </div>
+                        </div>
                         
-                        <!-- Right pane: Scrollable timeline of past and future -->
-                        <div id="schedule-list" class="right-pane grid">
-                            <!-- Iterated items go here -->
+                        <!-- Right pane: contains either the timeline or the progress tracker -->
+                        <div class="right-pane">
+                            <!-- Timeline of past and future (visible by default) -->
+                            <div id="schedule-list" class="grid">
+                                <!-- Iterated items go here -->
+                            </div>
+
+                            <!-- Math Exam Prep Progress view (hidden by default) -->
+                            <div id="student-progress-dashboard" style="display: none; flex-direction: column; gap: 1.5rem;">
+                                <!-- Top area: Evolution illustration card & Total Progress -->
+                                <div class="progress-hero-grid" style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+                                    <!-- Evolution card -->
+                                    <div id="evolution-card" class="card glass" style="display: flex; align-items: center; gap: 2rem; padding: 2rem; position: relative; overflow: hidden; border-radius: 20px; transition: all 0.5s ease;">
+                                        <!-- Evolution Illustration frame -->
+                                        <div class="evolution-graphic-container" style="flex-shrink: 0; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 4.5rem; position: relative; transition: all 0.3s ease; box-shadow: 0 0 20px var(--glass-border); border: 2px solid var(--glass-border);">
+                                            <span id="evolution-avatar">🥚</span>
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <span class="status-badge" id="evolution-stage-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; font-size: 0.85rem; padding: 0.4rem 1rem;">🥚 タマゴ期</span>
+                                            <h3 id="evolution-title" style="font-size: 1.8rem; margin: 0.6rem 0 0.4rem 0; font-weight: 700; color: white;">冒険の始まり！</h3>
+                                            <p id="evolution-message" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 0;">まずは各単元の基礎を固めましょう！</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Total progress summary -->
+                                    <div class="card glass" style="padding: 2rem; display: flex; flex-direction: column; justify-content: center;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 0.8rem;">
+                                            <div>
+                                                <h4 style="margin: 0; font-size: 1.2rem;">数学 全体進捗率</h4>
+                                                <p class="subtitle" style="margin: 0; font-size: 0.8rem;">受験までに必要な全チェックの達成度</p>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <strong id="total-progress-percentage" style="font-size: 2.2rem; color: var(--primary); font-family: 'Outfit', sans-serif;">0%</strong>
+                                            </div>
+                                        </div>
+                                        <div class="progress-bar-container" style="width: 100%; background: rgba(0,0,0,0.2); border-radius: 10px; height: 16px; overflow: hidden; border: 1px solid var(--glass-border);">
+                                            <div id="total-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);"></div>
+                                        </div>
+                                        <div id="subject-progress-mini-rates" style="margin-top: 1.2rem; display: flex; flex-wrap: wrap; gap: 0.8rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; justify-content: space-around;">
+                                            <!-- Dynamically filled by student.js -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Guide Message -->
+                                <div class="card glass" style="padding: 1rem 1.5rem; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-left: 5px solid var(--primary); display: flex; align-items: center; gap: 0.8rem;">
+                                    <span style="font-size: 1.3rem;">📢</span>
+                                    <div style="font-size: 0.9rem; line-height: 1.5; color: var(--text-main);">
+                                        <strong>大学受験までにどこまで学習が終わっているかチェックしよう！</strong><br>
+                                        単元の右側にある「教科書」〜「共テ過去問」を達成するごとに進捗率が上がり、上のキャラクターが進化するよ！
+                                    </div>
+                                </div>
+
+                                <!-- Grade Selector -->
+                                <div class="card glass" style="padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                                        <label for="progress-grade-select" style="margin-bottom: 0; font-weight: bold; color: var(--text-muted); font-size: 0.9rem;">🏫 表示対象学年:</label>
+                                        <select id="progress-grade-select" style="width: auto; min-width: 150px; padding: 0.4rem 0.8rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--glass-border); font-weight: bold; cursor: pointer;">
+                                            <option value="1">1年生の学習内容</option>
+                                            <option value="2">2年生までの学習内容</option>
+                                            <option value="3">3年生までの学習内容</option>
+                                        </select>
+                                        <span id="grade-pointer-hint" style="display: none; font-size: 1.4rem; animation: pointLeft 0.5s infinite alternate; margin-left: 0.5rem; user-select: none; vertical-align: middle;">👈</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                                        <label for="progress-course-select" style="margin-bottom: 0; font-weight: bold; color: var(--text-muted); font-size: 0.9rem;">📚 文理区分:</label>
+                                        <select id="progress-course-select" style="width: auto; min-width: 120px; padding: 0.4rem 0.8rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--glass-border); font-weight: bold; cursor: pointer;">
+                                            <option value="rikei">理系</option>
+                                            <option value="bunkei">文系</option>
+                                        </select>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                        ※ クラス名から自動判定されますが、自由に変更可能です。
+                                    </div>
+                                </div>
+
+                                <!-- Progress Table/List container -->
+                                <div id="curriculum-progress-list" class="grid" style="gap: 1.5rem;">
+                                    <!-- Rendered by student.js -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -244,7 +331,14 @@
             <h4 style="margin-bottom: 0.8rem; color: var(--text-main);">バージョン履歴</h4>
             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.8rem;">
                 <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--primary);">
-                    <strong style="color: var(--primary); font-size: 1rem;">v0.2.4</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04 (最新)</span>
+                    <strong style="color: var(--primary); font-size: 1rem;">v0.3.0</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/05 (最新)</span>
+                    <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
+                        <li>数学受験対策・単元進捗管理機能を追加（5段階チェックリスト）</li>
+                        <li>進捗状況に応じた「キャラクター進化（イラスト変化）」のモチベーションシステムを追加</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                    <strong style="color: var(--text-main); font-size: 1rem;">v0.2.4</strong> <span style="margin-left: 0.5rem; font-size: 0.8rem;">2026/04</span>
                     <ul style="margin-top: 0.6rem; padding-left: 1.2rem; margin-bottom: 0; line-height: 1.5;">
                         <li>iPad/Safariにおけるダウンロード・ファイル表示が反応しない問題を修正</li>
                         <li>タッチデバイスでの「ダブルタップ問題（不要なホバー状態）」を解消し、操作性を最適化</li>

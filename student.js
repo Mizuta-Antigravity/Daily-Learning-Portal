@@ -4,6 +4,8 @@ const Student = {
     cachedFiles: null,
 
     init: async () => {
+        Student.setupTabs();
+        Student.setupProgressGradeSelector();
         await Student.setupPeriodSelector();
         Student.renderSchedule(true);
     },
@@ -472,5 +474,839 @@ const Student = {
                 resolve(null);
             };
         });
+    },
+
+    // ---------------------------------------------------------
+    // 受験対策・単元進捗管理機能のロジック
+    // ---------------------------------------------------------
+    progressState: null,
+
+    // 数学カリキュラムの全マスタデータ
+    mathCurriculum: [
+        {
+            grade: 1,
+            subject: "数学I",
+            unit: "数と式",
+            details: ["式の展開", "因数分解", "実数", "根号を含む式の計算", "1次不等式"]
+        },
+        {
+            grade: 1,
+            subject: "数学I",
+            unit: "集合と命題",
+            details: ["集合", "命題と条件", "命題と証明"]
+        },
+        {
+            grade: 1,
+            subject: "数学I",
+            unit: "2次関数",
+            details: ["関数とグラフ", "２次関数のグラフとその移動", "２次関数の最大・最小と決定", "２次方程式", "グラフと２次方程式", "２次不等式"]
+        },
+        {
+            grade: 1,
+            subject: "数学I",
+            unit: "図形と計量",
+            details: ["三角比の基本", "三角比の拡張", "正弦定理と余弦定理", "三角形の面積、空間図形への応用"]
+        },
+        {
+            grade: 1,
+            subject: "数学I",
+            unit: "データの分析",
+            details: ["データの整理、データの代表値", "データの散らばり", "分散と標準偏差", "データの相関", "仮説検定の考え方"]
+        },
+        {
+            grade: 1,
+            subject: "数学A",
+            unit: "場合の数",
+            details: ["集合の要素の個数", "場合の数", "順列", "円順列・重複順列", "組み合わせ"]
+        },
+        {
+            grade: 1,
+            subject: "数学A",
+            unit: "確率",
+            details: ["事象と確率", "確率の基本性質", "独立な試行・反復試行の確率", "条件付き確率", "期待値"]
+        },
+        {
+            grade: 1,
+            subject: "数学A",
+            unit: "図形の性質",
+            details: ["三角形の辺の比、五心", "チェバの定理、メネラウスの定理", "三角形の辺と角", "円に内接する四角形", "円と直線、２つの円の位置関係", "作図", "空間図形"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "式と証明",
+            details: ["二項定理", "多項式の割り算", "分数式とその計算", "恒等式", "等式の証明", "不等式の証明"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "複素数と方程式",
+            details: ["複素数", "2次方程式の解と判別式", "解と係数の関係", "解の存在範囲", "剰余の定理と因数定理", "高次方程式"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "図形と方程式",
+            details: ["点と座標", "直線の方程式、2直線の関係", "円の方程式", "円と直線", "2つの円", "軌跡と方程式", "不等式の表す領域"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "三角関数",
+            details: ["一般角と三角関数", "三角関数の性質、グラフ", "方程式,不等式,最大・最小", "加法定理", "和と積の公式", "三角関数の合成", "三角関数の種々の問題"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "指数関数・対数関数",
+            details: ["指数の拡張", "指数関数", "対数とその性質", "対数関数", "常用対数"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "微分法",
+            details: ["微分係数", "導関数", "接線", "関数の増減,極值", "最大値・最小值", "グラフと方程式・不等式"]
+        },
+        {
+            grade: 2,
+            subject: "数学II",
+            unit: "積分法",
+            details: ["不定積分", "定積分", "定積分で表された関数", "面積"]
+        },
+        {
+            grade: 2,
+            subject: "数学B",
+            unit: "数列",
+            details: ["等差数列", "等比数列", "和の記号∑", "階差数列", "いろいろな数列の和", "漸化式と数列", "数学的帰納法"]
+        },
+        {
+            grade: 2,
+            subject: "数学C",
+            unit: "平面上のベクトル",
+            details: ["ベクトルの演算", "ベクトルの成分", "ベクトルの内積", "位置ベクトル", "ベクトルと図形", "ベクトル方程式"]
+        },
+        {
+            grade: 2,
+            subject: "数学C",
+            unit: "空間のベクトル",
+            details: ["空間の座標", "空間のベクトル、ベクトルの成分", "空間のベクトルの内積", "位置ベクトル、ベクトルと図形", "座標空間における図形", "平面の方程式、直線の方程式"]
+        },
+        {
+            grade: 2,
+            subject: "数学C",
+            unit: "複素数平面（理系）",
+            details: ["複素数平面", "複素数の極形式と乗法、除法", "ド・モアブルの定理", "複素数と図形 (1)", "複素数と図形 (2)"]
+        },
+        {
+            grade: 2,
+            subject: "数学C",
+            unit: "式と曲線（理系）",
+            details: ["放物線,楕円", "双曲線", "2次曲線の移動", "2次曲線と直線", "2次曲線の性質", "曲線の媒介変数表示", "極座標,極方程式"]
+        },
+        {
+            grade: 3,
+            subject: "数学B",
+            unit: "統計的な推測（文系）",
+            details: ["確率変数と確率分布", "確率変数の変換", "確率変数の和と期待値", "二項分布", "正規分布", "母集団と標本、標本平均とその分布", "推定", "仮説検定"]
+        },
+        {
+            grade: 3,
+            subject: "数学III",
+            unit: "関数（理系）",
+            details: ["分数関数", "無理関数", "逆関数と合成関数"]
+        },
+        {
+            grade: 3,
+            subject: "数学III",
+            unit: "極限",
+            details: ["数列の極限", "無限等比数列", "無限級数", "関数の極限", "三角関数と極限", "関数の連続性"]
+        },
+        {
+            grade: 3,
+            subject: "数学III",
+            unit: "微分法",
+            details: ["微分係数と導関数", "導関数の計算", "いろいろな関数の導関数", "第n次導関数、関数のいろいろな表し方"]
+        },
+        {
+            grade: 3,
+            subject: "数学III",
+            unit: "微分法の応用",
+            details: ["接線と法線", "平均値の定理", "関数の値の変化、最大・最小", "関数のグラフ", "方程式,不等式への応用", "速度と加速度,近似式"]
+        },
+        {
+            grade: 3,
+            subject: "数学III",
+            unit: "積分法",
+            details: ["不定積分とその基本性質", "不定積分の置換積分法・部分積分法", "いろいろな関数の不定積分", "定積分とその基本性質", "定積分の置換積分法・部分積分法", "定積分で表された関数", "定積分と和の極限", "定積分と不等式"]
+        }
+    ],
+
+    setupTabs: () => {
+        const btnDaily = document.getElementById('tab-daily-learning');
+        const btnExam = document.getElementById('tab-exam-progress');
+        if (!btnDaily || !btnExam) return;
+
+        btnDaily.onclick = () => {
+            btnDaily.classList.add('active');
+            btnExam.classList.remove('active');
+            document.getElementById('schedule-list').style.display = 'grid';
+            document.getElementById('student-progress-dashboard').style.display = 'none';
+            document.getElementById('student-header-controls').style.display = 'flex';
+            
+            // Re-run auto-scroll to today
+            const anchor = document.getElementById('timeline-anchor');
+            if (anchor && Student.currentPeriod === 'all') {
+                setTimeout(() => {
+                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        };
+
+        btnExam.onclick = () => {
+            btnExam.classList.add('active');
+            btnDaily.classList.remove('active');
+            document.getElementById('schedule-list').style.display = 'none';
+            document.getElementById('student-progress-dashboard').style.display = 'flex';
+            document.getElementById('student-header-controls').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'instant' });
+
+            // Check for first-time grade confirmation
+            const hasConfirmed = localStorage.getItem('has_confirmed_grade');
+            if (!hasConfirmed) {
+                Student.showGradeConfirmationModal();
+            } else {
+                // Show pointing finger animation for 4 seconds from 2nd time onwards
+                const hint = document.getElementById('grade-pointer-hint');
+                if (hint) {
+                    hint.style.display = 'inline-flex';
+                    setTimeout(() => {
+                        hint.style.transition = 'opacity 0.8s ease';
+                        hint.style.opacity = '0';
+                        setTimeout(() => {
+                            hint.style.display = 'none';
+                            hint.style.opacity = '1';
+                        }, 800);
+                    }, 4000);
+                }
+            }
+
+            Student.renderProgress();
+        };
+    },
+
+    setupProgressGradeSelector: () => {
+        const gradeSelector = document.getElementById('progress-grade-select');
+        const courseSelector = document.getElementById('progress-course-select');
+        if (!gradeSelector || !courseSelector) return;
+
+        const savedGrade = localStorage.getItem('confirmed_grade');
+        if (savedGrade) {
+            gradeSelector.value = savedGrade;
+        } else {
+            let defaultGrade = '3';
+            if (App.currentUser && App.currentUser.class) {
+                const classStr = String(App.currentUser.class);
+                if (classStr.includes('1') || classStr.includes('１')) defaultGrade = '1';
+                else if (classStr.includes('2') || classStr.includes('２')) defaultGrade = '2';
+                else if (classStr.includes('3') || classStr.includes('３')) defaultGrade = '3';
+            }
+            gradeSelector.value = defaultGrade;
+        }
+
+        const savedCourse = localStorage.getItem('confirmed_course');
+        if (savedCourse) {
+            courseSelector.value = savedCourse;
+        } else {
+            courseSelector.value = 'rikei'; // Default to Science
+        }
+
+        gradeSelector.onchange = (e) => {
+            localStorage.setItem('confirmed_grade', e.target.value);
+            localStorage.setItem('has_confirmed_grade', 'true');
+            Student.renderProgress();
+        };
+
+        courseSelector.onchange = (e) => {
+            localStorage.setItem('confirmed_course', e.target.value);
+            localStorage.setItem('has_confirmed_grade', 'true');
+            Student.renderProgress();
+        };
+    },
+
+    showGradeConfirmationModal: () => {
+        // Create backdrop
+        const modal = document.createElement('div');
+        modal.id = 'grade-confirm-modal';
+        modal.className = 'glass';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.right = '0';
+        modal.style.bottom = '0';
+        modal.style.zIndex = '2000';
+        modal.style.display = 'flex';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        modal.style.background = 'rgba(0, 0, 0, 0.85)';
+        modal.style.backdropFilter = 'blur(10px)';
+
+        const card = document.createElement('div');
+        card.className = 'calendar-content glass';
+        card.style.padding = '2.5rem 2rem';
+        card.style.textAlign = 'center';
+        card.style.maxWidth = '440px';
+        card.style.boxShadow = '0 20px 50px rgba(0,0,0,0.5)';
+        card.style.border = '1px solid var(--glass-border)';
+        card.style.borderRadius = '24px';
+        card.style.background = 'rgba(15, 23, 42, 0.95)';
+
+        let selectedGrade = '3';
+        let selectedCourse = 'rikei';
+
+        card.innerHTML = `
+            <div style="font-size: 3rem; margin-bottom: 0.5rem; animation: bounce 2s infinite;">🏫</div>
+            <h3 style="margin: 0 0 0.8rem 0; font-size: 1.5rem; font-weight: 700; color: white;">学年と文理区分を教えてください</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 2rem;">
+                最初の1回だけ設定をお願いします。<br>ご自身の学年と文理区分に合った最適なカリキュラムが表示されます。<br>
+                <span style="color: var(--primary); font-weight: bold;">※後からいつでも変更できます。</span>
+            </p>
+            
+            <!-- Grade Selection -->
+            <div style="margin-bottom: 1.5rem; text-align: left;">
+                <label style="font-weight: bold; font-size: 0.9rem; color: white; display: block; margin-bottom: 0.6rem;">🏫 学年を選択:</label>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                    <button class="modal-select-btn grade-opt" data-val="1" style="padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; cursor: pointer; font-weight: bold; width: 100%;">1年生</button>
+                    <button class="modal-select-btn grade-opt" data-val="2" style="padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; cursor: pointer; font-weight: bold; width: 100%;">2年生</button>
+                    <button class="modal-select-btn grade-opt active" data-val="3" style="padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; border: 2px solid var(--primary); background: rgba(99, 102, 241, 0.2); color: white; cursor: pointer; font-weight: bold; width: 100%;">3年生</button>
+                </div>
+            </div>
+            
+            <!-- Course Selection -->
+            <div style="margin-bottom: 2.2rem; text-align: left;">
+                <label style="font-weight: bold; font-size: 0.9rem; color: white; display: block; margin-bottom: 0.6rem;">📚 文理区分を選択:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <button class="modal-select-btn course-opt active" data-val="rikei" style="padding: 0.8rem; font-size: 0.95rem; border-radius: 8px; border: 2px solid var(--primary); background: rgba(99, 102, 241, 0.2); color: white; cursor: pointer; font-weight: bold; width: 100%;">🧪 理系 (数IIIあり)</button>
+                    <button class="modal-select-btn course-opt" data-val="bunkei" style="padding: 0.8rem; font-size: 0.95rem; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; cursor: pointer; font-weight: bold; width: 100%;">🎨 文系 (数IIIなし)</button>
+                </div>
+            </div>
+            
+            <button id="modal-confirm-btn" style="min-height: 52px; font-size: 1.1rem; font-weight: bold; border-radius: 12px; background: var(--success); color: white; border: none; cursor: pointer; width: 100%; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">設定を完了する ✨</button>
+        `;
+
+        modal.appendChild(card);
+        document.body.appendChild(modal);
+
+        // Add options behavior
+        const gradeOpts = card.querySelectorAll('.grade-opt');
+        const courseOpts = card.querySelectorAll('.course-opt');
+
+        gradeOpts.forEach(btn => {
+            btn.onclick = () => {
+                gradeOpts.forEach(b => {
+                    b.style.border = '1px solid var(--glass-border)';
+                    b.style.background = 'rgba(255,255,255,0.05)';
+                    b.classList.remove('active');
+                });
+                btn.style.border = '2px solid var(--primary)';
+                btn.style.background = 'rgba(99, 102, 241, 0.2)';
+                btn.classList.add('active');
+                selectedGrade = btn.getAttribute('data-val');
+            };
+        });
+
+        courseOpts.forEach(btn => {
+            btn.onclick = () => {
+                courseOpts.forEach(b => {
+                    b.style.border = '1px solid var(--glass-border)';
+                    b.style.background = 'rgba(255,255,255,0.05)';
+                    b.classList.remove('active');
+                });
+                btn.style.border = '2px solid var(--primary)';
+                btn.style.background = 'rgba(99, 102, 241, 0.2)';
+                btn.classList.add('active');
+                selectedCourse = btn.getAttribute('data-val');
+            };
+        });
+
+        card.querySelector('#modal-confirm-btn').onclick = () => {
+            localStorage.setItem('confirmed_grade', selectedGrade);
+            localStorage.setItem('confirmed_course', selectedCourse);
+            localStorage.setItem('has_confirmed_grade', 'true');
+            
+            const gradeSelect = document.getElementById('progress-grade-select');
+            if (gradeSelect) gradeSelect.value = selectedGrade;
+
+            const courseSelect = document.getElementById('progress-course-select');
+            if (courseSelect) courseSelect.value = selectedCourse;
+            
+            // Fade out and remove
+            modal.style.transition = 'opacity 0.3s ease';
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.remove();
+                Student.renderProgress();
+            }, 300);
+        };
+    },
+
+    getEvolutionStage: (percentage) => {
+        if (percentage >= 100) {
+            return {
+                level: 5,
+                avatar: "👑",
+                stageName: "👑 数学の覇者 (Lv.Max)",
+                title: "完全制覇！",
+                message: "すべての単元をクリアしました！自信を持って入試に挑みましょう！",
+                class: "evo-stage-5"
+            };
+        } else if (percentage >= 80) {
+            return {
+                level: 4,
+                avatar: "🐉",
+                stageName: "🐉 伝説のマスター (Lv.5)",
+                title: "志望校合格まであと一歩！",
+                message: "大樹のように知識が茂っています。最後の仕上げを行いましょう！",
+                class: "evo-stage-4"
+            };
+        } else if (percentage >= 60) {
+            return {
+                level: 3,
+                avatar: "⚔️",
+                stageName: "⚔️ 実力派ナイト (Lv.4)",
+                title: "実力が花開いてきた！",
+                message: "綺麗な花が咲くように知識が定着してきました。過去問でさらに磨きましょう！",
+                class: "evo-stage-3"
+            };
+        } else if (percentage >= 40) {
+            return {
+                level: 2,
+                avatar: "🏹",
+                stageName: "🏹 見習いハンター (Lv.3)",
+                title: "受験の基礎が整ってきた！",
+                message: "若葉が青々と茂るように、着実に解ける範囲が広がっています！",
+                class: "evo-stage-2"
+            };
+        } else if (percentage >= 20) {
+            return {
+                level: 1,
+                avatar: "🌱",
+                stageName: "🌱 ひよっこ期 (Lv.2)",
+                title: "少しずつ成長中！",
+                message: "双葉が芽吹きました！この調子で基本の問題を積み重ねていきましょう。",
+                class: "evo-stage-1"
+            };
+        } else {
+            return {
+                level: 0,
+                avatar: "🥚",
+                stageName: "🥚 タマゴ期 (Lv.1)",
+                title: "冒険の始まり！",
+                message: "まずは教科書の内容から確認して、土台を作っていきましょう！",
+                class: "evo-stage-0"
+            };
+        }
+    },
+
+    renderProgress: async () => {
+        const container = document.getElementById('curriculum-progress-list');
+        if (!container) return;
+
+        if (!Student.progressState) {
+            container.innerHTML = '<p class="glass" style="padding: 2rem;">進捗データを読み込んでいます...</p>';
+            try {
+                const doc = await db.collection('progress').doc(App.currentUser.email).get();
+                if (doc.exists) {
+                    Student.progressState = doc.data().progress || {};
+                } else {
+                    Student.progressState = {};
+                }
+            } catch (e) {
+                console.error('Error fetching progress:', e);
+                Student.progressState = {};
+            }
+        }
+
+        Student.renderProgressUI();
+    },
+
+    renderProgressUI: () => {
+        const container = document.getElementById('curriculum-progress-list');
+        const gradeSelector = document.getElementById('progress-grade-select');
+        if (!container || !gradeSelector) return;
+
+        const maxGrade = parseInt(gradeSelector.value || '3');
+        const courseSelector = document.getElementById('progress-course-select');
+        const course = courseSelector ? courseSelector.value : (localStorage.getItem('confirmed_course') || 'rikei');
+
+        // Filter curriculum by grade and course
+        const filteredCurriculum = Student.mathCurriculum.filter(item => {
+            // Grade check
+            if (item.grade > maxGrade) return false;
+            
+            // Course check
+            if (course === 'bunkei') {
+                // Bunkei: No Math III, No (理系) units
+                if (item.subject === '数学III') return false;
+                if (item.unit.includes('（理系）') || item.unit.includes('(理系)')) return false;
+            } else if (course === 'rikei') {
+                // Rikei: No (文系) units
+                if (item.unit.includes('（文系）') || item.unit.includes('(文系)')) return false;
+            }
+            
+            return true;
+        });
+
+        // Group by Subject
+        const subjects = {};
+        filteredCurriculum.forEach(item => {
+            if (!subjects[item.subject]) {
+                subjects[item.subject] = [];
+            }
+            subjects[item.subject].push(item);
+        });
+
+        // Calculate progress stats (Weighted: Textbook:2, Workbook:2, Chart:2, Mock:1, Common:1)
+        const STEP_WEIGHTS = [2, 2, 2, 1, 1];
+        const UNIT_MAX_WEIGHT = 8; // 2 + 2 + 2 + 1 + 1
+
+        let totalWeightPossible = filteredCurriculum.length * UNIT_MAX_WEIGHT;
+        let totalWeightDone = 0;
+
+        filteredCurriculum.forEach(item => {
+            const key = `${item.grade}_${item.subject}_${item.unit}`;
+            const state = Student.progressState[key] || [false, false, false, false, false];
+            state.forEach((checked, index) => {
+                if (checked) {
+                    totalWeightDone += STEP_WEIGHTS[index];
+                }
+            });
+        });
+
+        const overallPercent = totalWeightPossible > 0 ? Math.round((totalWeightDone / totalWeightPossible) * 100) : 0;
+
+        // Update overall progress percentage and bar
+        document.getElementById('total-progress-percentage').innerText = `${overallPercent}%`;
+        
+        const progressBar = document.getElementById('total-progress-bar');
+        if (progressBar) {
+            progressBar.style.width = `${overallPercent}%`;
+            
+            // Dynamically change color and glow depending on the progress level
+            let barColor = 'linear-gradient(90deg, var(--primary), var(--success))';
+            let barGlow = '0 0 10px rgba(99, 102, 241, 0.5)';
+            
+            if (overallPercent >= 100) {
+                barColor = 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)'; // 👑 Gold Master
+                barGlow = '0 0 15px rgba(245, 158, 11, 0.8)';
+            } else if (overallPercent >= 80) {
+                barColor = 'linear-gradient(90deg, #10b981, #34d399)'; // 🐉 Emerald Dragon
+                barGlow = '0 0 12px rgba(16, 185, 129, 0.6)';
+            } else if (overallPercent >= 60) {
+                barColor = 'linear-gradient(90deg, #8b5cf6, #a78bfa)'; // ⚔️ Violet Knight
+                barGlow = '0 0 10px rgba(139, 92, 246, 0.5)';
+            } else if (overallPercent >= 40) {
+                barColor = 'linear-gradient(90deg, #3b82f6, #60a5fa)'; // 🏹 Blue Hunter
+                barGlow = '0 0 10px rgba(59, 130, 246, 0.5)';
+            } else if (overallPercent >= 20) {
+                barColor = 'linear-gradient(90deg, #f59e0b, #fbbf24)'; // 🌱 Amber Sprout
+                barGlow = '0 0 10px rgba(245, 158, 11, 0.5)';
+            } else {
+                barColor = 'linear-gradient(90deg, #f43f5e, #fb7185)'; // 🥚 Rose Egg
+                barGlow = '0 0 10px rgba(244, 63, 94, 0.5)';
+            }
+            
+            progressBar.style.background = barColor;
+            progressBar.style.boxShadow = barGlow;
+        }
+
+        // Update Subject-by-Subject Mini Progress Rates
+        const miniContainer = document.getElementById('subject-progress-mini-rates');
+        if (miniContainer) {
+            let miniHtml = '';
+            Object.keys(subjects).forEach(subjName => {
+                const items = subjects[subjName];
+                let subjPossible = items.length * UNIT_MAX_WEIGHT;
+                let subjDone = 0;
+                items.forEach(item => {
+                    const key = `${item.grade}_${item.subject}_${item.unit}`;
+                    const state = Student.progressState[key] || [false, false, false, false, false];
+                    state.forEach((checked, index) => {
+                        if (checked) {
+                            subjDone += STEP_WEIGHTS[index];
+                        }
+                    });
+                });
+                const subjPercent = subjPossible > 0 ? Math.round((subjDone / subjPossible) * 100) : 0;
+                
+                miniHtml += `
+                    <div style="text-align: center; flex: 1; min-width: 80px; padding: 0.5rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold; margin-bottom: 0.2rem;">${subjName}</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: white; font-family: 'Outfit', sans-serif;">${subjPercent}%</div>
+                        <div style="width: 100%; height: 4px; background: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; margin-top: 0.4rem;">
+                            <div style="width: ${subjPercent}%; height: 100%; background: var(--primary);"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            miniContainer.innerHTML = miniHtml;
+        }
+
+        // Update Character Evolution Card
+        const evoStage = Student.getEvolutionStage(overallPercent);
+        const evoCard = document.getElementById('evolution-card');
+        if (evoCard) {
+            // Remove previous classes
+            evoCard.className = 'card glass';
+            evoCard.classList.add(evoStage.class);
+        }
+        document.getElementById('evolution-avatar').innerText = evoStage.avatar;
+        document.getElementById('evolution-stage-badge').innerText = evoStage.stageName;
+        document.getElementById('evolution-title').innerText = evoStage.title;
+        document.getElementById('evolution-message').innerText = evoStage.message;
+
+        // Render curriculum HTML
+        let html = '';
+
+        Object.keys(subjects).forEach(subjName => {
+            const items = subjects[subjName];
+            
+            // Calculate progress for this subject (Weighted)
+            let subjPossible = items.length * UNIT_MAX_WEIGHT;
+            let subjDone = 0;
+            items.forEach(item => {
+                const key = `${item.grade}_${item.subject}_${item.unit}`;
+                const state = Student.progressState[key] || [false, false, false, false, false];
+                state.forEach((checked, index) => {
+                    if (checked) {
+                        subjDone += STEP_WEIGHTS[index];
+                    }
+                });
+            });
+            const subjPercent = subjPossible > 0 ? Math.round((subjDone / subjPossible) * 100) : 0;
+
+            html += `
+                <div class="curriculum-subject-group glass">
+                    <div class="curriculum-subject-header" onclick="Student.toggleSubjectGroup(this)">
+                        <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                            <span style="font-size: 1.2rem; color: white;">${subjName}</span>
+                            <span style="font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: normal; color: var(--text-muted);">
+                                進捗率: ${subjPercent}% (${subjDone}/${subjPossible}ステップ)
+                            </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <!-- Simple progress bar inside header -->
+                            <div style="width: 100px; height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow: hidden; border: 1px solid var(--glass-border);">
+                                <div style="width: ${subjPercent}%; height: 100%; background: var(--primary);"></div>
+                            </div>
+                            <span class="accordion-arrow">🔽</span>
+                        </div>
+                    </div>
+                    <div class="curriculum-units-container">
+            `;
+
+            items.forEach(item => {
+                const key = `${item.grade}_${item.subject}_${item.unit}`;
+                const state = Student.progressState[key] || [false, false, false, false, false];
+                const completedSteps = state.filter(Boolean).length;
+
+                html += `
+                    <div class="unit-row">
+                        <div class="unit-row-main">
+                            <div class="unit-info-block">
+                                <div class="unit-name">
+                                    <span>🎯 ${item.unit}</span>
+                                    <span style="font-size: 0.75rem; color: ${completedSteps === 5 ? 'var(--success)' : 'var(--text-muted)'}; font-weight: normal;">
+                                        (${completedSteps}/5 完了)
+                                    </span>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.3rem;">
+                                    <button class="unit-details-toggle" onclick="Student.toggleDetails('${key}')" id="toggle-btn-${key}">
+                                        学習内容を表示 🔽
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="steps-container">
+                                <button class="step-btn ${state[0] ? 'checked' : ''}" onclick="Student.toggleStep('${key}', 0)">
+                                    ${state[0] ? '✅' : '⬜'} 教科書
+                                </button>
+                                <button class="step-btn ${state[1] ? 'checked' : ''}" onclick="Student.toggleStep('${key}', 1)">
+                                    ${state[1] ? '✅' : '⬜'} 問題集
+                                </button>
+                                <button class="step-btn ${state[2] ? 'checked' : ''}" onclick="Student.toggleStep('${key}', 2)">
+                                    ${state[2] ? '✅' : '⬜'} チャート重要
+                                </button>
+                                <button class="step-btn ${state[3] ? 'checked' : ''}" onclick="Student.toggleStep('${key}', 3)">
+                                    ${state[3] ? '✅' : '⬜'} 進研模試過去問
+                                </button>
+                                <button class="step-btn ${state[4] ? 'checked' : ''}" onclick="Student.toggleStep('${key}', 4)">
+                                    ${state[4] ? '✅' : '⬜'} 共通テスト過去問
+                                </button>
+                            </div>
+                        </div>
+                        <div class="unit-details-content" id="details-${key}" style="display: none;">
+                            <strong>学習内容のヒント:</strong> ${item.details.join('、')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
+
+    toggleStep: async (unitKey, stepIndex) => {
+        if (!Student.progressState) Student.progressState = {};
+        if (!Student.progressState[unitKey]) {
+            Student.progressState[unitKey] = [false, false, false, false, false];
+        }
+
+        // Toggle state
+        const newState = !Student.progressState[unitKey][stepIndex];
+        Student.progressState[unitKey][stepIndex] = newState;
+
+        if (newState) {
+            Student.playSuccessSound(stepIndex);
+        } else {
+            Student.playRemoveSound();
+        }
+
+        // Re-render UI to be responsive immediately
+        Student.renderProgressUI();
+
+        // Write to Firestore in background
+        try {
+            await db.collection('progress').doc(App.currentUser.email).set({
+                email: App.currentUser.email,
+                progress: Student.progressState,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        } catch (e) {
+            console.error('Error saving progress update:', e);
+        }
+    },
+
+    toggleDetails: (unitKey) => {
+        const detailsEl = document.getElementById(`details-${unitKey}`);
+        const btnEl = document.getElementById(`toggle-btn-${unitKey}`);
+        if (!detailsEl || !btnEl) return;
+
+        if (detailsEl.style.display === 'none') {
+            detailsEl.style.display = 'block';
+            btnEl.innerHTML = '学習内容を折りたたむ 🔼';
+        } else {
+            detailsEl.style.display = 'none';
+            btnEl.innerHTML = '学習内容を表示 🔽';
+        }
+    },
+
+    toggleSubjectGroup: (headerEl) => {
+        const groupEl = headerEl.parentElement;
+        const container = groupEl.querySelector('.curriculum-units-container');
+        const arrow = groupEl.querySelector('.accordion-arrow'); // fixed selection bug (groupEl instead of headerEl)
+        if (!container || !arrow) return;
+
+        if (container.style.display === 'none') {
+            container.style.display = 'flex';
+            arrow.innerText = '🔽';
+        } else {
+            container.style.display = 'none';
+            arrow.innerText = '▶️';
+        }
+    },
+
+    playSuccessSound: (stepIndex = 0) => {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            
+            const playNote = (type, freq, startTime, duration, volume = 0.1) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, startTime);
+                
+                gain.gain.setValueAtTime(volume, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            };
+            
+            const now = ctx.currentTime;
+            
+            if (stepIndex === 0) {
+                // 教科書: Simple & clean rising double-beep
+                playNote('sine', 523.25, now, 0.1, 0.08); // C5
+                playNote('sine', 659.25, now + 0.06, 0.15, 0.08); // E5
+            } else if (stepIndex === 1) {
+                // 問題集: Pleasant standard triple chord
+                playNote('triangle', 659.25, now, 0.1, 0.08); // E5
+                playNote('triangle', 783.99, now + 0.06, 0.1, 0.08); // G5
+                playNote('triangle', 1046.50, now + 0.12, 0.22, 0.08); // C6
+            } else if (stepIndex === 2) {
+                // チャート重要: Shimmering bell arpeggio
+                playNote('triangle', 783.99, now, 0.08, 0.06); // G5
+                playNote('triangle', 1046.50, now + 0.06, 0.08, 0.06); // C6
+                playNote('triangle', 1318.51, now + 0.12, 0.08, 0.06); // E6
+                playNote('sine', 1567.98, now + 0.18, 0.3, 0.08); // G6 (shimmer)
+            } else if (stepIndex === 3) {
+                // 進研模試過去問: Triumphant C major chord fanfare
+                playNote('triangle', 523.25, now, 0.35, 0.06); // C5
+                playNote('triangle', 659.25, now + 0.04, 0.35, 0.06); // E5
+                playNote('triangle', 783.99, now + 0.08, 0.4, 0.06); // G5
+                playNote('sine', 1046.50, now + 0.12, 0.45, 0.08); // C6
+                playNote('sine', 1318.51, now + 0.16, 0.5, 0.06); // E6
+            } else if (stepIndex === 4) {
+                // 共通テスト過去問: Retro legendary level-up fanfare!
+                playNote('triangle', 523.25, now, 0.08, 0.06);   // C5
+                playNote('triangle', 659.25, now + 0.05, 0.08, 0.06); // E5
+                playNote('triangle', 783.99, now + 0.10, 0.08, 0.06); // G5
+                playNote('triangle', 1046.50, now + 0.15, 0.08, 0.06); // C6
+                playNote('triangle', 1318.51, now + 0.20, 0.08, 0.06); // E6
+                playNote('triangle', 1567.98, now + 0.25, 0.08, 0.06); // G6
+                
+                // End power chord
+                playNote('sine', 2093.00, now + 0.30, 0.8, 0.08); // C7
+                playNote('triangle', 1046.50, now + 0.30, 0.8, 0.06); // C6
+                playNote('triangle', 1318.51, now + 0.30, 0.8, 0.06); // E6
+                playNote('triangle', 1567.98, now + 0.30, 0.8, 0.06); // G6
+            }
+        } catch (e) {
+            console.error('Sound play failed:', e);
+        }
+    },
+
+    playRemoveSound: () => {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(329.63, ctx.currentTime); // E4 (low tone)
+            
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
+        } catch (e) {}
     }
 };
+
